@@ -35,7 +35,7 @@ def plot_well_log(df, column, label):
     plt.grid(True)
     st.pyplot(plt)
 
-# App Title
+# App Titlegj
 st.title("Well Log Insights")
 
 # Data Option: Use sample data or upload data
