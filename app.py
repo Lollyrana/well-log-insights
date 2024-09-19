@@ -74,7 +74,8 @@ def calculate_saturation(df, a, m, n, rw):
 st.title("Well Log Insights")
 
 # Data Option: Use sample data or upload data
-use_sample_data = st.checkbox("Use Sample Data", value=False)
+st.markdown("Don't have data to upload?     \nClick the button below to try sample data.")
+use_sample_data = st.button("Use Sample Data")
 
 if use_sample_data:
     st.session_state.df = load_sample_data()
