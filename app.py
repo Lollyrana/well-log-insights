@@ -6,7 +6,7 @@ import io
 import xlsxwriter
 
 # PostgreSQL connection
-DATABASE_URL = "postgresql://postgres:Lolly%40sql@localhost:5432/well_log_data"
+DATABASE_URL = "postgresql://postgres:Lolly%40sql@localhost:5432/well log data"
 engine = create_engine(DATABASE_URL)
 
 # Function to load data from the database
@@ -25,7 +25,7 @@ if 'df' not in st.session_state:
 
 # Function to plot well log data
 def plot_well_logs(df, columns):
-    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']  # Define a list of colors
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'b' ,'g', 'r', 'c', 'm', 'y']  # Define a list of colors
     num_cols = len(columns)
     
     fig, axes = plt.subplots(1, num_cols, figsize=(5 * num_cols, 20), sharey=True)
