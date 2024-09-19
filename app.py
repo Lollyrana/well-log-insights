@@ -99,7 +99,8 @@ if not st.session_state.df.empty:
     st.dataframe(df)
 
     # Select columns to plot
-    selected_logs = st.multiselect("Select logs to plot", df.columns[1:], default=df.columns[1:4])
+    st.subheader("Select logs to plot")
+    selected_logs = st.multiselect("", df.columns[1:], default=df.columns[1:4])
 
     # Plot well log data
     if selected_logs:
