@@ -69,13 +69,23 @@ def classify_lithology(row):
         return 'Limestone'
     else:
         return 'Unknown'
+def calculate_shale_volume(df):
+    # Determine GR_min and GR_max from the dataset
+    GR_min = df['GR'].min()  # Clean sand value (lowest GR)
+    GR_max = df['GR'].max()  # Shale value (highest GR)
 
+    # Calculate shale volume
+    df['Vsh'] = (df['GR'] - GR_min) / (GR_max - GR_min)
+    df['Vsh'] = df['Vsh'].clip(lower=0, upper=1)  # Ensure Vsh is between 0 and 1
+    return df, GR_min, GR_max
 # Function to classify lithology for the entire dataset
 def apply_lithology_classification(df):
     df['Lithology'] = df.apply(classify_lithology, axis=1)
     lithology_colors = {'Shale': 'brown', 'Sandstone': 'yellow', 'Limestone': 'blue', 'Unknown': 'gray'}
     df['Lithology Color'] = df['Lithology'].map(lithology_colors)  # Add a color column for plotting
-    return df
+    df, GR_min, GR_max = calculate_shale_volume(df)
+    
+    return df, GR_min, GR_max
 
 
 def plot_gamma_with_lithology(df):
@@ -104,6 +114,8 @@ def plot_gamma_with_lithology(df):
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+    plot_image_path = "log_plots.png"
+    plt.savefig(plot_image_path)
     st.pyplot(plt)
 # Function to calculate water saturation
 def calculate_saturation(df, a, m, n, rw):
@@ -158,10 +170,11 @@ if not st.session_state.df.empty:
 
 
     if st.button("Classify Lithology"):
-        st.session_state.df = apply_lithology_classification(st.session_state.df)
+        st.session_state.df, GR_min, GR_max = apply_lithology_classification(st.session_state.df)
         st.success("Lithology classified successfully.")
         
-        
+        st.write(f"GR_min (Clean Sand): {GR_min:.2f} API")
+        st.write(f"GR_max (100% Shale): {GR_max:.2f} API")
         
         # Plot gamma log with lithology shading
         plot_gamma_with_lithology(st.session_state.df)
@@ -233,6 +246,8 @@ if not st.session_state.df.empty:
             ax.set_xlabel("Hydrocarbon Zones")
             ax.set_ylabel("Depth")
             ax.legend()
+            plot_image_path = "hydrocarbon_zone_plots.png"
+            plt.savefig(plot_image_path)
             st.pyplot(fig)
     df = identify_hydrocarbon_zones(df)
     # Data Export and Reporting
@@ -247,9 +262,12 @@ if not st.session_state.df.empty:
             workbook = writer.book
             worksheet = workbook.add_worksheet('Plots')
             worksheet.insert_image('A1', 'well_log_plots.png')
+            worksheet.insert_image('A100', 'log_plots.png')
+            worksheet.insert_image('P100', 'hydrocarbon_zone_plots.png')
+
            
         st.download_button(
-            label='Download Excel File',
+            label='Download Excel File with plots',
             data=buffer.getvalue(),
             file_name='well_log_data_with_plots.xlsx',
             mime='application/vnd.ms-excel'
