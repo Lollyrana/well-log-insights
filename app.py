@@ -55,7 +55,56 @@ def calculate_porosity(df, rho_m, rho_f):
     df['porosity'] = (rho_m - df['RHOB']) / (rho_m - rho_f)
     st.session_state.df = df  # Update session state
     return df
+def classify_lithology(row):
+    GR = row['GR']
+    DPOR = row['DPOR']
+    CNLS = row['CNLS']
 
+    # Basic lithology classification based on GR, DPOR, and CNLS
+    if GR > 75:  # High GR value indicates shale
+        return 'Shale'
+    elif 50 < GR <= 75 and DPOR > 10 and CNLS > 25:  # Medium GR, high porosity and CNLS suggest sandstone
+        return 'Sandstone'
+    elif GR <= 50 and DPOR < 10 and CNLS < 25:  # Low GR, low porosity suggest limestone
+        return 'Limestone'
+    else:
+        return 'Unknown'
+
+# Function to classify lithology for the entire dataset
+def apply_lithology_classification(df):
+    df['Lithology'] = df.apply(classify_lithology, axis=1)
+    lithology_colors = {'Shale': 'brown', 'Sandstone': 'yellow', 'Limestone': 'blue', 'Unknown': 'gray'}
+    df['Lithology Color'] = df['Lithology'].map(lithology_colors)  # Add a color column for plotting
+    return df
+
+
+def plot_gamma_with_lithology(df):
+    plt.figure(figsize=(10, 15))
+
+    # Define colors for lithology
+    lithology_colors = {
+        'Shale': 'brown',
+        'Sandstone': 'yellow',
+        'Limestone': 'blue',
+        'Unknown': 'gray'
+    }
+    
+    # Plot the gamma log
+    plt.plot(df['GR'], df['Depth'], label='Gamma Ray', color='black')
+
+    # Shade areas based on lithology
+    for lithology, color in lithology_colors.items():
+        lith_df = df[df['Lithology'] == lithology]
+        plt.fill_betweenx(lith_df['Depth'], lith_df['GR'], color=color, alpha=0.5, label=lithology)
+
+    plt.gca().invert_yaxis()  # Invert y-axis for depth
+    plt.xlabel('Gamma Ray (API)')
+    plt.ylabel('Depth (m)')
+    plt.title('Gamma Ray Log with Lithology Shading')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    st.pyplot(plt)
 # Function to calculate water saturation
 def calculate_saturation(df, a, m, n, rw):
     if 'porosity' not in df.columns:
@@ -105,6 +154,18 @@ if not st.session_state.df.empty:
     # Plot well log data
     if selected_logs:
         plot_well_logs(st.session_state.df, selected_logs)
+    st.subheader("Lithology Classification")
+
+
+    if st.button("Classify Lithology"):
+        st.session_state.df = apply_lithology_classification(st.session_state.df)
+        st.success("Lithology classified successfully.")
+        
+        
+        
+        # Plot gamma log with lithology shading
+        plot_gamma_with_lithology(st.session_state.df)
+
 
     # Porosity calculation form
     with st.form(key='porosity_form'):
