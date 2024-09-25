@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 import matplotlib.pyplot as plt
 import io
 import xlsxwriter
-
+import numpy as np
 # PostgreSQL connection
 DATABASE_URL = "postgresql://postgres:Lolly%40sql@localhost:5432/well log data"
 engine = create_engine(DATABASE_URL)
@@ -17,11 +17,13 @@ def load_data():
 # Function to load sample data
 def load_sample_data():
     df = pd.read_csv("log.csv")
+    # df.drop(["DPOR"])
     return df
 
 # Initialize session state for df if not already present
 if 'df' not in st.session_state:
     st.session_state['df'] = pd.DataFrame()  # Empty DataFrame as default
+
 
 # Function to plot well log data
 def plot_well_logs(df, columns):
@@ -34,6 +36,7 @@ def plot_well_logs(df, columns):
         axes = [axes]  # Ensure axes is iterable if only one column is selected
 
     for ax, column, color in zip(axes, columns, colors[:num_cols]):
+        
         ax.plot(df[column], df['Depth'], label=column, color=color)
         ax.invert_yaxis()
         ax.set_xlabel(column)
@@ -46,6 +49,33 @@ def plot_well_logs(df, columns):
     plt.savefig(plot_image_path)
 
     st.pyplot(fig)
+
+def plot_cross_plots_with_color(df, x_column, y_column, color_column):
+    # Create a figure and axis for the plot
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Create a scatter plot where color depends on the 'color_column'
+    scatter = ax.scatter(df[x_column], df[y_column], c=df[color_column], cmap='jet', alpha=0.6, edgecolor='k')
+
+    # Add a colorbar for reference
+    cbar = plt.colorbar(scatter)
+    cbar.set_label(color_column)
+
+    # Set labels and title
+    ax.set_xlabel(x_column)
+    ax.set_ylabel(y_column)
+    ax.set_title(f"{x_column} vs {y_column} Colored by {color_column}")
+
+    # Optional: Draw a regression line
+    if x_column in df.columns and y_column in df.columns:
+        m, b = np.polyfit(df[x_column], df[y_column], 1)
+        ax.plot(df[x_column], m * df[x_column] + b, color='black', linewidth=2, label=f"y = {m:.2f}x + {b:.2f}")
+        ax.legend()
+
+    # Show the plot
+    plt.tight_layout()
+    st.pyplot(fig)
+
 
 # Function to calculate porosity
 def calculate_porosity(df, rho_m, rho_f):
@@ -61,14 +91,20 @@ def classify_lithology(row):
     CNLS = row['CNLS']
 
     # Basic lithology classification based on GR, DPOR, and CNLS
-    if GR > 75:  # High GR value indicates shale
+    vsh = row['Vsh']
+    if vsh >= 0.5:
         return 'Shale'
-    elif 50 < GR <= 75 and DPOR > 10 and CNLS > 25:  # Medium GR, high porosity and CNLS suggest sandstone
-        return 'Sandstone'
-    elif GR <= 50 and DPOR < 10 and CNLS < 25:  # Low GR, low porosity suggest limestone
-        return 'Limestone'
+    
+
     else:
-        return 'Unknown'
+        if GR > 75:
+            return 'Shale'
+        elif 50 < GR <= 75 and DPOR > 10 and CNLS > 25:  # Medium GR, high porosity and CNLS suggest sandstone
+            return 'Sandstone'
+        elif GR <= 50 and DPOR < 10 and CNLS < 25:  # Low GR, low porosity suggest limestone
+            return 'Limestone'
+        else:
+            return 'Unknown'
 def calculate_shale_volume(df):
     # Determine GR_min and GR_max from the dataset
     GR_min = df['GR'].min()  # Clean sand value (lowest GR)
@@ -77,14 +113,15 @@ def calculate_shale_volume(df):
     # Calculate shale volume
     df['Vsh'] = (df['GR'] - GR_min) / (GR_max - GR_min)
     df['Vsh'] = df['Vsh'].clip(lower=0, upper=1)  # Ensure Vsh is between 0 and 1
+    st.session_state.df = df  # Update session state
     return df, GR_min, GR_max
 # Function to classify lithology for the entire dataset
 def apply_lithology_classification(df):
+    df, GR_min, GR_max = calculate_shale_volume(df)
     df['Lithology'] = df.apply(classify_lithology, axis=1)
     lithology_colors = {'Shale': 'brown', 'Sandstone': 'yellow', 'Limestone': 'blue', 'Unknown': 'gray'}
     df['Lithology Color'] = df['Lithology'].map(lithology_colors)  # Add a color column for plotting
-    df, GR_min, GR_max = calculate_shale_volume(df)
-    
+    st.session_state.df = df  # Update session state
     return df, GR_min, GR_max
 
 
@@ -160,12 +197,30 @@ if not st.session_state.df.empty:
     st.dataframe(df)
 
     # Select columns to plot
-    st.subheader("Select logs to plot")
-    selected_logs = st.multiselect("", df.columns[1:], default=df.columns[1:4])
+    st.subheader("Plot logs with depth or crossplot")
+    plot_type = st.selectbox("Select Plot Type", ["Normal Plot", "Cross Plot"])
+    
 
     # Plot well log data
-    if selected_logs:
-        plot_well_logs(st.session_state.df, selected_logs)
+    
+    if plot_type == "Normal Plot":
+            selected_logs = st.multiselect("", df.columns[1:], default=df.columns[1:4])
+            plot_well_logs(st.session_state.df, selected_logs)
+    else:
+        columns_without_depth = [col for col in df.columns if col != 'Depth']
+        default_x_column = 'RHOB' if 'RHOB' in columns_without_depth else columns_without_depth[0]
+        default_y_column = 'MN' if 'MN' in columns_without_depth else columns_without_depth[0]
+        default_color_column = 'GR' if 'GR' in columns_without_depth else columns_without_depth[0]
+
+         # Streamlit selectbox with default preselected columns
+        x_column = st.selectbox("Select X-axis for Cross Plot", columns_without_depth, index=columns_without_depth.index(default_x_column))
+        y_column = st.selectbox("Select Y-axis for Cross Plot", columns_without_depth, index=columns_without_depth.index(default_y_column))
+        color_column = st.selectbox("Select Color Variable", columns_without_depth, index=columns_without_depth.index(default_color_column))
+# Call the cross plot function only when both columns are selected
+        if x_column and y_column:
+    
+            plot_cross_plots_with_color(st.session_state.df , x_column, y_column, color_column)
+            
     st.subheader("Lithology Classification")
 
 
