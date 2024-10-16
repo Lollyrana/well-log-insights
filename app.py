@@ -212,8 +212,8 @@ if not st.session_state.df.empty:
         default_y_column = 'CNLS' if 'CNLS' in columns_without_depth else columns_without_depth[0]
        
          # Streamlit selectbox with default preselected columns
-        x_column = st.selectbox("Select X-axis for Cross Plot", columns_without_depth, index=columns_without_depth.index(default_x_column))
-        y_column = st.selectbox("Select Y-axis for Cross Plot", columns_without_depth, index=columns_without_depth.index(default_y_column))
+        y_column = st.selectbox("Select X-axis for Cross Plot", columns_without_depth, index=columns_without_depth.index(default_x_column))
+        x_column = st.selectbox("Select Y-axis for Cross Plot", columns_without_depth, index=columns_without_depth.index(default_y_column))
         
 # Call the cross plot function only when both columns are selected
         if x_column and y_column:
