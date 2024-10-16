@@ -50,31 +50,31 @@ def plot_well_logs(df, columns):
 
     st.pyplot(fig)
 
-def plot_cross_plots_with_color(df, x_column, y_column, color_column):
-    # Create a figure and axis for the plot
-    fig, ax = plt.subplots(figsize=(8, 6))
+def plot_cross_plots(df, neutron_column, density_column):
+    # Create a figure and the axis for the plot
+    fig, ax = plt.subplots(figsize=(4, 8))
 
-    # Create a scatter plot where color depends on the 'color_column'
-    scatter = ax.scatter(df[x_column], df[y_column], c=df[color_column], cmap='jet', alpha=0.6, edgecolor='k')
+    # Plot the neutron porosity (shared scale for both logs)
+    ax.plot(df[neutron_column], df['Depth'], color='blue', label=f"{neutron_column} (Neutron Porosity)", linewidth = 0.5)
 
-    # Add a colorbar for reference
-    cbar = plt.colorbar(scatter)
-    cbar.set_label(color_column)
+    # Plot the density porosity on the same axis
+    ax.plot(df[density_column], df['Depth'], color='green', label=f"{density_column} (Density Porosity)",linewidth = 0.5)
 
     # Set labels and title
-    ax.set_xlabel(x_column)
-    ax.set_ylabel(y_column)
-    ax.set_title(f"{x_column} vs {y_column} Colored by {color_column}")
+    ax.set_xlabel("Porosity (%)")  # Shared x-axis for porosity
+    ax.set_ylabel('Depth')
+    ax.set_title(f"{neutron_column} and {density_column} vs Depth")
 
-    # Optional: Draw a regression line
-    if x_column in df.columns and y_column in df.columns:
-        m, b = np.polyfit(df[x_column], df[y_column], 1)
-        ax.plot(df[x_column], m * df[x_column] + b, color='black', linewidth=2, label=f"y = {m:.2f}x + {b:.2f}")
-        ax.legend()
+    # Invert the vertical axis (depth increases downward)
+    ax.invert_yaxis()
+    ax.grid(True)
+    # Show legend
+    ax.legend()
 
-    # Show the plot
+    # Adjust layout and display the plot
     plt.tight_layout()
     st.pyplot(fig)
+
 
 
 # Function to calculate porosity
@@ -89,7 +89,7 @@ def classify_lithology(row):
     GR = row['GR']
     DPOR = row['DPOR']
     CNLS = row['CNLS']
-
+    
     # Basic lithology classification based on GR, DPOR, and CNLS
     vsh = row['Vsh']
     if vsh >= 0.5:
@@ -208,18 +208,17 @@ if not st.session_state.df.empty:
             plot_well_logs(st.session_state.df, selected_logs)
     else:
         columns_without_depth = [col for col in df.columns if col != 'Depth']
-        default_x_column = 'RHOB' if 'RHOB' in columns_without_depth else columns_without_depth[0]
-        default_y_column = 'MN' if 'MN' in columns_without_depth else columns_without_depth[0]
-        default_color_column = 'GR' if 'GR' in columns_without_depth else columns_without_depth[0]
-
+        default_x_column = 'DPOR' if 'DPOR' in columns_without_depth else columns_without_depth[0]
+        default_y_column = 'CNLS' if 'CNLS' in columns_without_depth else columns_without_depth[0]
+       
          # Streamlit selectbox with default preselected columns
         x_column = st.selectbox("Select X-axis for Cross Plot", columns_without_depth, index=columns_without_depth.index(default_x_column))
         y_column = st.selectbox("Select Y-axis for Cross Plot", columns_without_depth, index=columns_without_depth.index(default_y_column))
-        color_column = st.selectbox("Select Color Variable", columns_without_depth, index=columns_without_depth.index(default_color_column))
+        
 # Call the cross plot function only when both columns are selected
         if x_column and y_column:
     
-            plot_cross_plots_with_color(st.session_state.df , x_column, y_column, color_column)
+            plot_cross_plots(st.session_state.df , x_column, y_column)
             
     st.subheader("Lithology Classification")
 
@@ -273,11 +272,11 @@ if not st.session_state.df.empty:
             st.error("Porosity not calculated yet.")
             return df
 
-        gas_mask = (df['RILD'] > 100) & (df['porosity'] > 0.15)
         oil_mask = (df['RILD'] > 50) & (df['RILD'] <= 100) & (df['porosity'] > 0.1)
-        water_mask = ~gas_mask & ~oil_mask
+        gas_mask = (df['RILD'] > 100) & (df['porosity'] > 0.15) & (df['DPOR'] - df['CNLS'] > 10)
+       
 
-        df['hydrocarbon_zone'] = 'Water'
+       
         df.loc[gas_mask, 'hydrocarbon_zone'] = 'Gas'
         df.loc[oil_mask, 'hydrocarbon_zone'] = 'Oil'
 
@@ -296,7 +295,7 @@ if not st.session_state.df.empty:
             fig, ax = plt.subplots(figsize=(5, 10))
             ax.fill_betweenx(df['Depth'], 0, 1, where=(df['hydrocarbon_zone'] == 'Gas'), color='yellow', label='Gas')
             ax.fill_betweenx(df['Depth'], 0, 1, where=(df['hydrocarbon_zone'] == 'Oil'), color='green', label='Oil')
-            ax.fill_betweenx(df['Depth'], 0, 1, where=(df['hydrocarbon_zone'] == 'Water'), color='blue', label='Water')
+            # ax.fill_betweenx(df['Depth'], 0, 1, where=(df['hydrocarbon_zone'] == 'Water'), color='blue', label='Water')
             ax.invert_yaxis()
             ax.set_xlabel("Hydrocarbon Zones")
             ax.set_ylabel("Depth")
